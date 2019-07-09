@@ -36,11 +36,39 @@ var server = http.createServer(function(req, res) {
     });
     req.on('end', function() {
         buffer += decoder.end();
-        //send the repsonse
-        res.end("hello world\n");
 
-        //log the request path
-        console.log('Request recieved with this payload: ', buffer);
+        //Choose the handler this request should go to. If one not found choose the not found handler
+        var choosenHandler = typeof(router[trimmedPath]) !== 'undefined' ? router[trimmedPath] : handlers.notFound;
+
+        //Construct the data object to send to the object
+        var data = {
+            'trimmedPath': trimmedPath,
+            'queryStringObject': queryStringObject,
+            'method': method,
+            'headers': headers,
+            'payload': buffer
+        };
+
+        //Route the request to the handler specified in router
+        choosenHandler(data, function(statusCode, payload) {
+            //use the statusCode called by handler or default to 200
+            statusCode = typeof(statusCode) === 'number' ? statusCode : 200;
+
+            //use the payload called back by handler or default to empty object
+            payload = typeof(payload) === 'object' ? payload : {};
+
+            //convert the payload to string
+            var payloadString = JSON.stringify(payload);
+
+            //return the repsonse
+            res.writeHead(statusCode);
+
+            res.end(payloadString);
+
+            //log the request path
+            console.log('Returning this response: ', statusCode, payloadString);
+        });
+
     });
 });
 
@@ -48,3 +76,21 @@ var server = http.createServer(function(req, res) {
 server.listen(3000, function() {
     console.log("The server is listening on port 3000 now");
 });
+
+//Define the handlers
+var handlers = {};
+
+//Define the sample handler
+handlers.sample = function(data, callback) {
+    callback(406, { "name": "Sample handle" });
+};
+
+//Define the Not found handler
+handlers.notFound = function(data, callback) {
+    callback(404);
+};
+
+//Define the request router
+var router = {
+    'sample': handlers.sample
+};
